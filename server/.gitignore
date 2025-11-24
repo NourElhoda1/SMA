@@ -1,0 +1,12 @@
+__pycache__/
+venev/
+*.pyc
+instance/
+.env    
+.DS_Store
+migrations/
+*.sqlite3
+
+venv/
+__pycache__/
+.env
