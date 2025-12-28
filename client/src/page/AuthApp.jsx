@@ -182,9 +182,9 @@ export default function AuthApp() {
                 <BrainCircuit size={20} />
                 <h3>Mémoire IA</h3>
               </div>
-              <button onClick={() => fetchUserProfile(token)} className="text-indigo-400 hover:text-indigo-700 transition-colors" title="Actualiser">
+              {/* <button onClick={() => fetchUserProfile(token)} className="text-indigo-400 hover:text-indigo-700 transition-colors" title="Actualiser">
                 <RefreshCw size={16} />
-              </button>
+              </button> */}
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
@@ -243,9 +243,9 @@ export default function AuthApp() {
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               AI Assistant
             </h3>
-            <button onClick={() => fetchUserProfile(token)} className="text-gray-400 hover:text-blue-500 transition-colors" title="Refresh Memory">
+            {/* <button onClick={() => fetchUserProfile(token)} className="text-gray-400 hover:text-blue-500 transition-colors" title="Refresh Memory">
               <RefreshCw size={18} />
-            </button>
+            </button> */}
           </div>
 
           {/* Chat Messages */}
