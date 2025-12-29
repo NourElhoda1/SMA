@@ -11,17 +11,11 @@ from pymongo import MongoClient, ASCENDING
 import bcrypt
 from jose import jwt, JWTError
 from bson import ObjectId
-
-# Note: On n'importe plus google.generativeai ici car l'UserAgent gère Groq en interne.
-
-# --- IMPORT DU NOUVEL AGENT ---
 from agents.user_agent import UserAgent
 
-# --- 1. CONFIGURATION ---
 class Settings(BaseSettings):
     MONGO_URI: str
     JWT_SECRET: str
-    # On remplace Gemini par Groq dans la validation
     GROQ_API_KEY: str 
     SERPAPI_KEY: Optional[str] = None
     
@@ -34,21 +28,16 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# --- 2. BASE DE DONNÉES ---
 client = MongoClient(settings.MONGO_URI)
 db = client["user_agent_db"]
 users_collection = db["users"]
 memory_collection = db["user_memory"]
 
-# Index pour la rapidité et l'unicité
 users_collection.create_index([("email", ASCENDING)], unique=True)
 memory_collection.create_index([("user_id", ASCENDING)], unique=True)
 
-# --- 3. INITIALISATION AGENT ---
-# L'agent s'initialise et se connecte à Groq tout seul (voir agents/user_agent.py)
 agent = UserAgent(db)
 
-# --- 4. FASTAPI SETUP ---
 app = FastAPI(title="SMA Unified API")
 
 app.add_middleware(
@@ -61,7 +50,6 @@ app.add_middleware(
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# --- 5. MODÈLES & UTILITAIRES ---
 class SignupModel(BaseModel):
     email: EmailStr
     password: str
@@ -101,7 +89,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Token invalide")
 
-# --- 6. ROUTES ---
 
 @app.post("/signup", status_code=201)
 def signup(payload: SignupModel):
@@ -117,7 +104,6 @@ def signup(payload: SignupModel):
     }
     res = users_collection.insert_one(user_doc)
     
-    # Init mémoire vide
     memory_collection.insert_one({
         "user_id": res.inserted_id,
         "likes": [],

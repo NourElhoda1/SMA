@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Lock, Mail, User, LogIn, UserPlus, Eye, EyeOff, Send, MessageSquare, RefreshCw, BrainCircuit } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function AuthApp() {
   const [isSignup, setIsSignup] = useState(false);
@@ -18,7 +20,6 @@ export default function AuthApp() {
   const [userData, setUserData] = useState(null);
   const [token, setToken] = useState('');
 
-  // --- Nouveaux états pour le Chat ---
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
@@ -114,7 +115,6 @@ export default function AuthApp() {
     }
   };
 
-  // --- Logique du Chat ---
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -138,7 +138,6 @@ export default function AuthApp() {
       
       if (response.ok) {
         setMessages(prev => [...prev, { role: 'ai', text: data.response }]);
-        // Rafraîchir le profil pour voir si la mémoire a changé (Likes/Dislikes)
         fetchUserProfile(token);
       } else {
         setMessages(prev => [...prev, { role: 'ai', text: "Erreur lors de la réponse." }]);
@@ -158,15 +157,10 @@ export default function AuthApp() {
     setFormData({ email: '', password: '', name: '' });
   };
 
-  // --- Vue Connectée (Profil + Chat) ---
   if (isLoggedIn && userData) {
     return (
       <div className="min-h-screen bg-slate-50 p-4 md:p-8 flex gap-6 justify-center items-start">
-        
-        {/* Colonne Gauche : Profil & Mémoire */}
         <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 sticky top-8 h-[750px] flex flex-col relative">
-          
-          {/* Header Profil */}
           <div className="text-center mb-6 flex-shrink-0">
             <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full mx-auto mb-4 flex items-center justify-center text-white shadow-lg">
               <User size={40} />
@@ -174,21 +168,15 @@ export default function AuthApp() {
             <h2 className="text-2xl font-bold text-gray-800">Welcome Back!</h2>
             <p className="text-lg text-gray-600 font-medium">{userData.name || 'User'}</p>
           </div>
-
-          {/* Carte Mémoire (Scrollable) */}
           <div className="flex-1 bg-indigo-50 border border-indigo-100 rounded-2xl p-4 overflow-hidden flex flex-col mb-16">
             <div className="flex items-center justify-between mb-3 border-b border-indigo-200 pb-2 flex-shrink-0">
               <div className="flex items-center gap-2 text-indigo-800 font-bold">
                 <BrainCircuit size={20} />
                 <h3>Mémoire IA</h3>
               </div>
-              {/* <button onClick={() => fetchUserProfile(token)} className="text-indigo-400 hover:text-indigo-700 transition-colors" title="Actualiser">
-                <RefreshCw size={16} />
-              </button> */}
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
-              {/* Section Likes */}
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-green-700 mb-2 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Ce que j'aime
@@ -204,7 +192,6 @@ export default function AuthApp() {
                 ) : <p className="text-gray-400 text-xs italic">Aucune donnée...</p>}
               </div>
 
-              {/* Section Dislikes */}
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-red-700 mb-2 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Ce que je déteste
@@ -224,7 +211,6 @@ export default function AuthApp() {
             
           </div>
 
-          {/* Bouton Logout Fixé en bas */}
           <div className='absolute inset-x-6 bottom-6'>
             <button
               onClick={handleLogout}
@@ -235,20 +221,14 @@ export default function AuthApp() {
           </div>
         </div>
 
-        {/* Colonne Droite : Chat Interface */}
         <div className="w-full  bg-white rounded-2xl shadow-xl flex flex-col h-[750px]">
-          {/* Chat Header */}
           <div className="p-4 border-b bg-white rounded-t-2xl flex justify-between items-center shadow-sm z-10">
             <h3 className="font-bold text-gray-700 flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               AI Assistant
             </h3>
-            {/* <button onClick={() => fetchUserProfile(token)} className="text-gray-400 hover:text-blue-500 transition-colors" title="Refresh Memory">
-              <RefreshCw size={18} />
-            </button> */}
           </div>
 
-          {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
             {messages.length === 0 && (
               <div className="text-center text-gray-400 mt-20">
@@ -261,13 +241,26 @@ export default function AuthApp() {
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div 
-                  className={`max-w-[80%] p-3 rounded-2xl shadow-sm text-sm ${
+                  className={`max-w-[80%] p-3 rounded-2xl shadow-sm text-sm overflow-hidden ${
                     msg.role === 'user' 
                       ? 'bg-blue-600 text-white rounded-tr-none' 
                       : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
                   }`}
                 >
-                  {msg.text}
+                  {msg.role === 'user' ? (
+                    msg.text
+                  ) : (
+                    <div className="prose prose-sm max-w-none">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          a: ({node, ...props}) => <a {...props} className="text-blue-600 underline hover:text-blue-800" target="_blank" rel="noopener noreferrer" />
+                        }}
+                      >
+                        {msg.text}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -283,7 +276,6 @@ export default function AuthApp() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Chat Input */}
           <div className="p-4 bg-white border-t rounded-b-2xl">
             <form onSubmit={handleSendMessage} className="flex gap-2">
               <input
@@ -308,7 +300,6 @@ export default function AuthApp() {
     );
   }
 
-  // --- Vue Non Connectée (Login/Signup) ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">

@@ -8,6 +8,7 @@ class BuyerAgent:
     def __init__(self):
         self.api_key = os.getenv("SERPAPI_KEY")
         
+        
     def search_products(self, query, max_price=None):
         print(f"🛒 Buyer Agent cherche : {query}...")
         
