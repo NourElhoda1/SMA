@@ -32,7 +32,7 @@ class UserAgent:
             tools=[SearchTool()],
             max_iter=3,
             llm=self.llm,
-            verbose=True,
+            verbose=False,
             allow_delegation=False
         )
 
