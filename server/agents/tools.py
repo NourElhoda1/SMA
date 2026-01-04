@@ -5,9 +5,8 @@ class SearchTool(BaseTool):
     name: str = "SearchGoogleShopping"
     description: str = (
         "Utile pour rechercher des prix actuels, des produits et des liens d'achat sur Google Shopping. "
-        "L'entrée doit être une requête de recherche simple (ex: 'iphone 15 prix')."
     )
 
     def _run(self, query: str) -> str:
         buyer = BuyerAgent()
-        return buyer.search_products(query)
+        return buyer.search(query)

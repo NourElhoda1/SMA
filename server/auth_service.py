@@ -16,7 +16,7 @@ from agents.user_agent import UserAgent
 class Settings(BaseSettings):
     MONGO_URI: str
     JWT_SECRET: str
-    GROQ_API_KEY: str 
+    OPENAI_API_KEY: str 
     SERPAPI_KEY: Optional[str] = None
     
     JWT_ALGORITHM: str = "HS256"
