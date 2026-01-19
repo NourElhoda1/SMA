@@ -1,3 +1,5 @@
+# agents/comparator_tool.py
+
 import json
 from crewai.tools import tool
 from agents.comparator import ComparatorAgent
@@ -5,40 +7,22 @@ from agents.comparator import ComparatorAgent
 _comparator = ComparatorAgent()
 
 @tool("compare_products")
-def compare_products(products_json: str) -> str:
+def compare_products(products: str) -> str:
     """
-    Classe et compare des produits selon prix, note et délai.
+    Compare et classe une liste de produits.
 
-    Input (JSON string) :
-    [
-      {
-        "title": "Product name",
-        "price": "120€",
-        "shipping": "10€",
-        "additionalFees": "5€",
-        "rating": 4.6,
-        "deliveryDays": "3",
-        "link": "<https://example.com>"
-      }
-    ]
-
-    Output :
-    JSON string avec produits classés par score décroissant.
+    Input: JSON string d'une liste de produits
+    Output: JSON string classé par score décroissant
     """
-
     try:
-        products = json.loads(products_json)
+        products_list = json.loads(products)
 
-        if not isinstance(products, list):
+        if not isinstance(products_list, list):
             raise ValueError("Input must be a list of products")
 
-        ranked = _comparator.compare(products)
+        ranked = _comparator.compare(products_list)
 
-        return json.dumps(
-            ranked,
-            ensure_ascii=False,
-            indent=2
-        )
+        return json.dumps(ranked, ensure_ascii=False, indent=2)
 
     except Exception as e:
         return json.dumps({

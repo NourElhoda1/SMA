@@ -7,8 +7,9 @@ import threading
 
 from crewai import Agent, Task, Crew, Process, LLM
 from agents.tools import SearchTool
-from agents.comparator import ComparatorAgent
+from agents.comparator_tool import compare_products
 from agents.buyer import BuyerAgent
+from agents.comparator import ComparatorAgent
 from agents.recommender import RecommenderAgent
 from agents.DealHunterAgent import DealHunterAgent
 
@@ -19,7 +20,6 @@ class UserAgent:
         self.history_col = db_instance["chat_history"]
 
         # Agents classiques
-        self.comparator_agent = ComparatorAgent()
         self.buyer = BuyerAgent()
         self.recommender_agent = RecommenderAgent()
         
@@ -44,6 +44,18 @@ class UserAgent:
             allow_delegation=False
         )
 
+        # Agent Comparator CrewAI
+        self.comparator_agent_crew = Agent(
+            role='Comparator Agent',
+            goal="Classer objectivement les produits reçus en utilisant l'outil de comparaison mathématique.",
+            backstory="Tu es un analyste rigoureux. Tu ne fais pas confiance aux mots, seulement aux chiffres. Tu dois utiliser ton outil pour calculer un score précis pour chaque produit.",
+            tools=[compare_products],
+            max_iter=3,
+            llm=self.llm,
+            verbose=True,
+            allow_delegation=False
+        )
+
         # Agent Recommender CrewAI
         self.recommender_agent_crew = Agent(
             role='Recommender Agent',
@@ -55,6 +67,7 @@ class UserAgent:
             allow_delegation=True
         )
 
+        
     # ---------------------------
     # MÉMOIRE UTILISATEUR
     # ---------------------------
@@ -158,13 +171,26 @@ class UserAgent:
         user_context = f"PROFIL UTILISATEUR :\n- Aime : {mem.get('likes')}\n- Déteste : {mem.get('dislikes')}\nHISTORIQUE RÉCENT : {history}\n"
 
         task = Task(
-            description=f"{user_context}\nDEMANDE : '{text}'\n1. Si l'utilisateur veut acheter ou voir des prix -> Buyer Agent.\n2. Si l'utilisateur veut un conseil -> Recommender Agent.\n3. Réponds en Markdown.",
-            expected_output="Réponse textuelle naturelle + JSON caché optionnel.",
-            agent=self.recommender_agent_crew
+            description=(
+                f"{user_context}\n"
+                f"DEMANDE UTILISATEUR : '{text}'\n\n"
+                "SUIVRE STRICTEMENT CE PLAN :\n"
+                "1. [Buyer Agent] Utilise 'SearchGoogleShopping' pour trouver les produits. Retourne le résultat en JSON brut.\n"
+                "2. [Comparator Agent] Prends le JSON du Buyer et utilise ton outil 'compare_products' pour calculer les scores. Retourne la liste triée.\n"
+                "3. [Recommender Agent] Prends la liste triée et rédige une réponse conviviale en expliquant pourquoi le premier produit est le meilleur.\n"
+                "Réponds en Markdown."
+            ),
+            expected_output="Une réponse naturelle recommandée basée sur le scoring mathématique.",
+            agent=self.recommender_agent_crew 
         )
 
+
         sma_crew = Crew(
-            agents=[self.buyer_agent_crew, self.recommender_agent_crew],
+            agents=[
+                self.buyer_agent_crew, 
+                self.comparator_agent_crew,
+                self.recommender_agent_crew
+            ],
             tasks=[task],
             process=Process.sequential,
             verbose=True,
