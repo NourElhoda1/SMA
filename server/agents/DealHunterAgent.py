@@ -18,31 +18,22 @@ class DealHunterAgent:
         self.db = db_instance
         self.deals_col = db_instance["deals"]
         self.alerts_col = db_instance["deal_alerts"]
-        
         self.buyer_agent = buyer_agent
         self.user_agent = user_agent
-        
-        # ✅ Voucherify API Configuration
         self.voucherify_app_id = os.getenv("VOUCHERIFY_APP_ID")
         self.voucherify_secret_key = os.getenv("VOUCHERIFY_SECRET_KEY")
         
         if not self.voucherify_app_id or not self.voucherify_secret_key:
             raise ValueError("VOUCHERIFY_APP_ID and VOUCHERIFY_SECRET_KEY must be set")
         
-        # Base64 encode credentials for authentication
         credentials = f"{self.voucherify_app_id}:{self.voucherify_secret_key}"
         self.voucherify_auth = base64.b64encode(credentials.encode()).decode()
-        
         self.voucherify_base_url = "https://api.voucherify.io/v1"
-        
-        # Queue pour traiter les deals
         self.deal_queue = Queue()
-        
-        # Seuils de pertinence
         self.IMMEDIATE_ALERT_THRESHOLD = 0.8
         self.BUYER_NOTIFY_THRESHOLD = 0.5
         
-        print("🎯 Deal Hunter Agent initialized with Voucherify API")
+        print("Deal Hunter Agent initialized with Voucherify API")
 
     def _get_voucherify_headers(self):
         """
@@ -71,9 +62,9 @@ class DealHunterAgent:
         result = self.deals_col.insert_one(monitoring_doc)
         monitoring_id = result.inserted_id
         
-        print(f"🔍 Starting deal monitoring for '{query}' (duration: {duration_hours}h)")
+        print(f"Starting deal monitoring for '{query}' (duration: {duration_hours}h)")
         
-        # Lancer la surveillance dans un thread séparé
+        
         thread = threading.Thread(
             target=self._monitor_loop,
             args=(str(monitoring_id), user_id, query, duration_hours),
@@ -88,61 +79,49 @@ class DealHunterAgent:
         Boucle de surveillance continue
         """
         end_time = datetime.utcnow() + timedelta(hours=duration_hours)
-        check_interval = 300  # Vérifier toutes les 5 minutes
+        check_interval = 300
         
         while datetime.utcnow() < end_time:
             try:
-                # 1. ✅ Chercher des vouchers sur Voucherify
                 vouchers = self._search_voucherify_vouchers(query)
-                
-                # 2. ✅ Chercher des campagnes/promotions sur Voucherify
                 campaigns = self._search_voucherify_campaigns(query)
-                
-                # 3. Chercher des promotions via Google Shopping
                 promotions = self._search_promotions(query)
-                
-                # 4. Détecter des bundles
                 bundles = self._detect_bundles(query)
                 
-                # 5. Analyser tous les deals trouvés
                 all_deals = vouchers + campaigns + promotions + bundles
                 
                 for deal in all_deals:
                     self._process_deal(deal, user_id, query)
                 
-                # Mettre à jour le compteur
                 self.deals_col.update_one(
                     {"_id": ObjectId(monitoring_id)},
                     {"$inc": {"deals_found": len(all_deals)}}
                 )
                 
-                print(f"✅ Deal scan complete for '{query}': {len(all_deals)} deals found")
+                print(f"Deal scan complete for '{query}': {len(all_deals)} deals found")
                 
             except Exception as e:
-                print(f"❌ Error in monitoring loop: {e}")
+                print(f"Error in monitoring loop: {e}")
                 import traceback
                 traceback.print_exc()
             
-            # Attendre avant le prochain scan
             time.sleep(check_interval)
         
-        # Désactiver la surveillance après expiration
         self.deals_col.update_one(
             {"_id": ObjectId(monitoring_id)},
             {"$set": {"active": False}}
         )
-        print(f"⏰ Monitoring expired for '{query}'")
+        print(f"Monitoring expired for '{query}'")
 
     def _search_voucherify_vouchers(self, query) -> List[Dict]:
         """
-        ✅ Recherche de vouchers via Voucherify API
+        Recherche de vouchers via Voucherify API
         """
         vouchers = []
         
         try:
             url = f"{self.voucherify_base_url}/vouchers"
             
-            # Paramètres de recherche
             params = {
                 "limit": 20,
                 "filters": {
@@ -157,7 +136,7 @@ class DealHunterAgent:
                 }
             }
             
-            print(f"🔍 Searching Voucherify vouchers...")
+            print(f"Searching Voucherify vouchers...")
             
             response = requests.get(
                 url,
@@ -170,12 +149,10 @@ class DealHunterAgent:
                 data = response.json()
                 
                 for voucher in data.get("vouchers", []):
-                    # Filtrer par pertinence avec la query
                     voucher_code = voucher.get("code", "")
                     voucher_name = voucher.get("name", "")
                     category = voucher.get("category", "")
                     
-                    # Vérifier si le voucher est pertinent
                     search_text = f"{voucher_code} {voucher_name} {category}".lower()
                     
                     discount_info = self._extract_discount_info(voucher)
@@ -197,13 +174,13 @@ class DealHunterAgent:
                     })
             
             else:
-                print(f"⚠️ Voucherify API error: {response.status_code}")
+                print(f"Voucherify API error: {response.status_code}")
                 print(f"Response: {response.text}")
             
-            print(f"✅ Found {len(vouchers)} vouchers from Voucherify")
+            print(f"Found {len(vouchers)} vouchers from Voucherify")
             
         except Exception as e:
-            print(f"❌ Error fetching Voucherify vouchers: {e}")
+            print(f"Error fetching Voucherify vouchers: {e}")
             import traceback
             traceback.print_exc()
         
@@ -211,14 +188,14 @@ class DealHunterAgent:
 
     def _search_voucherify_campaigns(self, query) -> List[Dict]:
         """
-        ✅ Recherche de campagnes/promotions via Voucherify API
+        Recherche de campagnes/promotions via Voucherify API
         """
         campaigns = []
         
         try:
             url = f"{self.voucherify_base_url}/campaigns"
             
-            print(f"🔍 Searching Voucherify campaigns...")
+            print(f"Searching Voucherify campaigns...")
             
             response = requests.get(
                 url,
@@ -233,8 +210,6 @@ class DealHunterAgent:
                 for campaign in data.get("campaigns", []):
                     campaign_name = campaign.get("name", "")
                     campaign_type = campaign.get("campaign_type", "")
-                    
-                    # Extraire les informations de réduction
                     voucher_data = campaign.get("voucher", {})
                     discount_info = self._extract_discount_info(voucher_data)
                     
@@ -255,12 +230,12 @@ class DealHunterAgent:
                     })
             
             else:
-                print(f"⚠️ Voucherify Campaigns API error: {response.status_code}")
-            
-            print(f"✅ Found {len(campaigns)} campaigns from Voucherify")
-            
+                print(f"Voucherify Campaigns API error: {response.status_code}")
+
+            print(f"Found {len(campaigns)} campaigns from Voucherify")
+
         except Exception as e:
-            print(f"❌ Error fetching Voucherify campaigns: {e}")
+            print(f"Error fetching Voucherify campaigns: {e}")
             import traceback
             traceback.print_exc()
         
@@ -268,7 +243,7 @@ class DealHunterAgent:
 
     def _extract_discount_info(self, voucher_data: Dict) -> Dict:
         """
-        ✅ Extrait les informations de réduction d'un voucher Voucherify
+        Extrait les informations de réduction d'un voucher Voucherify
         """
         discount = voucher_data.get("discount", {})
         
@@ -282,7 +257,7 @@ class DealHunterAgent:
             discount_text = f"{percent_off}% OFF"
             
         elif discount_type == "AMOUNT":
-            amount_off = discount.get("amount_off", 0) / 100  # Convert from cents
+            amount_off = discount.get("amount_off", 0) / 100  
             discount_amount = amount_off
             discount_text = f"${amount_off:.2f} OFF"
             
@@ -303,7 +278,7 @@ class DealHunterAgent:
 
     def validate_voucher(self, code: str, customer_id: Optional[str] = None) -> Dict:
         """
-        ✅ Valide un voucher avant de l'utiliser
+        Valide un voucher avant de l'utiliser
         """
         try:
             url = f"{self.voucherify_base_url}/vouchers/{code}/validate"
@@ -337,7 +312,7 @@ class DealHunterAgent:
                 }
                 
         except Exception as e:
-            print(f"❌ Error validating voucher: {e}")
+            print(f"Error validating voucher: {e}")
             return {
                 "valid": False,
                 "code": code,
@@ -346,7 +321,7 @@ class DealHunterAgent:
 
     def redeem_voucher(self, code: str, customer_id: str, order_amount: float) -> Dict:
         """
-        ✅ Redeem (utiliser) un voucher
+        Redeem (utiliser) un voucher
         """
         try:
             url = f"{self.voucherify_base_url}/vouchers/{code}/redemption"
@@ -356,7 +331,7 @@ class DealHunterAgent:
                     "source_id": customer_id
                 },
                 "order": {
-                    "amount": int(order_amount * 100)  # Convert to cents
+                    "amount": int(order_amount * 100)  
                 }
             }
             
@@ -383,7 +358,7 @@ class DealHunterAgent:
                 }
                 
         except Exception as e:
-            print(f"❌ Error redeeming voucher: {e}")
+            print(f"Error redeeming voucher: {e}")
             return {
                 "success": False,
                 "error": str(e)
@@ -420,7 +395,7 @@ class DealHunterAgent:
                     })
             
         except Exception as e:
-            print(f"⚠️ Error fetching promotions: {e}")
+            print(f"Error fetching promotions: {e}")
         
         return promotions
 
@@ -452,7 +427,7 @@ class DealHunterAgent:
                     })
             
         except Exception as e:
-            print(f"⚠️ Error detecting bundles: {e}")
+            print(f"Error detecting bundles: {e}")
         
         return bundles
 
@@ -467,7 +442,6 @@ class DealHunterAgent:
         deal["user_id"] = ObjectId(user_id)
         deal["query"] = query
         
-        # Éviter les doublons
         existing = self.deals_col.find_one({
             "user_id": ObjectId(user_id),
             "code": deal.get("code"),
@@ -475,12 +449,12 @@ class DealHunterAgent:
         })
         
         if existing:
-            print(f"⏭️ Deal already exists, skipping...")
+            print(f"Deal already exists, skipping...")
             return
         
         deal_id = self.deals_col.insert_one(deal).inserted_id
         
-        print(f"💎 Deal found: {deal.get('type')} - Score: {relevance_score:.2f}")
+        print(f"Deal found: {deal.get('type')} - Score: {relevance_score:.2f}")
         
         if relevance_score >= self.IMMEDIATE_ALERT_THRESHOLD:
             self._send_immediate_alert(deal, user_id)
@@ -494,27 +468,24 @@ class DealHunterAgent:
         """
         score = 0.0
         
-        # 1. Correspondance avec la requête (30%)
         searchable_text = f"{deal.get('name', '')} {deal.get('title', '')} {deal.get('category', '')}".lower()
         query_words = query.lower().split()
         matches = sum(1 for word in query_words if word in searchable_text)
         query_match_score = matches / len(query_words) if query_words else 0
         score += query_match_score * 0.3
         
-        # 2. Qualité de la réduction (40%)
         discount_amount = deal.get("discount_amount", 0)
         discount_type = deal.get("discount_type", "")
         
         if discount_type == "PERCENT":
             discount_score = min(discount_amount / 100, 1.0)
         elif discount_type == "AMOUNT":
-            discount_score = min(discount_amount / 50, 1.0)  # Normaliser sur $50
+            discount_score = min(discount_amount / 50, 1.0)  
         else:
             discount_score = 0.5
         
         score += discount_score * 0.4
         
-        # 3. Correspondance avec préférences (20%)
         user_prefs = self.user_agent.get_memory(user_id)
         likes = user_prefs.get("likes", [])
         
@@ -526,7 +497,6 @@ class DealHunterAgent:
         
         score += pref_match * 0.2
         
-        # 4. Statut actif et validité (10%)
         is_active = deal.get("active", False)
         has_expiration = bool(deal.get("expires") or deal.get("expiration_date"))
         
@@ -565,7 +535,7 @@ class DealHunterAgent:
             "sent": True
         })
         
-        print(f"🚨 IMMEDIATE ALERT sent to user {user_id}")
+        print(f"IMMEDIATE ALERT sent to user {user_id}")
         print(f"   → {alert['title']}")
         print(f"   → Code: {alert['code']}")
         print(f"   → Discount: {alert['discount']}")
@@ -591,7 +561,7 @@ class DealHunterAgent:
             "sent_to": "buyer_agent"
         })
         
-        print(f"📬 BUYER NOTIFICATION sent")
+        print(f"BUYER NOTIFICATION sent")
         print(f"   → Deal type: {deal.get('type')}")
         print(f"   → Code: {deal.get('code', 'N/A')}")
 
@@ -614,7 +584,7 @@ class DealHunterAgent:
 
     def get_voucher_by_code(self, code: str) -> Optional[Dict]:
         """
-        ✅ Récupère un voucher spécifique par son code
+        Récupère un voucher spécifique par son code
         """
         try:
             url = f"{self.voucherify_base_url}/vouchers/{code}"
@@ -628,11 +598,11 @@ class DealHunterAgent:
             if response.status_code == 200:
                 return response.json()
             else:
-                print(f"⚠️ Voucher not found: {code}")
+                print(f"Voucher not found: {code}")
                 return None
                 
         except Exception as e:
-            print(f"❌ Error fetching voucher: {e}")
+            print(f"Error fetching voucher: {e}")
             return None
 
     def stop_monitoring(self, monitoring_id: str):
@@ -643,4 +613,23 @@ class DealHunterAgent:
             {"_id": ObjectId(monitoring_id)},
             {"$set": {"active": False}}
         )
-        print(f"🛑 Monitoring stopped: {monitoring_id}")
+        print(f"Monitoring stopped: {monitoring_id}")
+
+    def find_deals_for_product(self, product: Dict) -> List[Dict]:
+        """
+        Cherche des coupons/deals pour un produit précis
+        """
+        deals = []
+        
+        product_name = product.get("title", "")
+        vouchers = self._search_voucherify_vouchers(product_name)
+        campaigns = self._search_voucherify_campaigns(product_name)
+        promotions = self._search_promotions(product_name)
+        bundles = self._detect_bundles(product_name)
+        
+        deals.extend(vouchers)
+        deals.extend(campaigns)
+        deals.extend(promotions)
+        deals.extend(bundles)
+    
+        return deals
