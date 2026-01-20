@@ -1,97 +1,143 @@
 import os
-from dotenv import load_dotenv
-import google.generativeai as genai
-from pymongo import MongoClient
+from datetime import datetime, timedelta
+from typing import Optional
 
-# ---------- Setup ----------
-load_dotenv()
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr
+from pydantic_settings import BaseSettings
+from pymongo import MongoClient, ASCENDING
+import bcrypt
+from jose import jwt, JWTError
+from bson import ObjectId
+from agents.user_agent import UserAgent
 
-# Configure Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+class Settings(BaseSettings):
+    MONGO_URI: str
+    JWT_SECRET: str
+    OPENAI_API_KEY: str 
+    SERPAPI_KEY: Optional[str] = None
+    
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXP_DELTA_SECONDS: int = 3600
+    
+    class Config:
+        env_file = ".env"
+        extra = "ignore" 
 
-# Connect to MongoDB
-mongo_client = MongoClient(os.getenv("MONGO_URI"))
-db = mongo_client["user_agent_db"]
-prefs_collection = db["preferences"]
+settings = Settings()
 
-# ---------- Memory Layer (MongoDB) ----------
-def set_pref(key, value):
-    prefs_collection.update_one({"key": key}, {"$set": {"value": value}}, upsert=True)
+client = MongoClient(settings.MONGO_URI)
+db = client["user_agent_db"]
+users_collection = db["users"]
+memory_collection = db["user_memory"]
 
-def get_all_prefs():
-    prefs = {}
-    for item in prefs_collection.find():
-        prefs[item["key"]] = item["value"]
-    return prefs
+users_collection.create_index([("email", ASCENDING)], unique=True)
+memory_collection.create_index([("user_id", ASCENDING)], unique=True)
 
-# ---------- UserAgent ----------
-class UserAgent:
-    def __init__(self):
-        self.model = genai.GenerativeModel("gemini-2.0-flash")
+agent = UserAgent(db)
 
-    def remember(self, text):
-        text_lower = text.lower()
-        if "i like" in text_lower:
-            pref = text_lower.split("i like", 1)[1].strip(". ")
-            set_pref("likes", pref)
-            return f"Got it! I'll remember you like {pref}."
-        elif "my name is" in text_lower:
-            name = text_lower.split("my name is", 1)[1].strip(". ")
-            set_pref("name", name)
-            return f"Nice to meet you, {name.title()}!"
-        return None
+app = FastAPI(title="SMA Unified API")
 
-    def chat(self, text):
-        # Check for memory updates
-        mem_response = self.remember(text)
-        if mem_response:
-            return mem_response
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-        # Retrieve preferences
-        prefs = get_all_prefs()
-        memory_context = (
-            "User preferences:\n" + "\n".join([f"- {k}: {v}" for k, v in prefs.items()])
-            if prefs else "No preferences yet."
-        )
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-        # Generate a response
-        response = self.model.generate_content(f"{memory_context}\nUser: {text}\nAssistant:")
-        return response.text
+class SignupModel(BaseModel):
+    email: EmailStr
+    password: str
+    name: Optional[str] = None
 
-# ---------- Example CrewAI Setup ----------
-# def setup_crewai():
-#     buyer = Agent(
-#         role="BuyerAgent",
-#         goal="Find and compare products or services.",
-#         backstory="An expert shopper who knows the best marketplaces and evaluates options objectively."
-#     )
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
 
-#     negotiator = Agent(
-#         role="NegotiatorAgent",
-#         goal="Negotiate the best terms and prices.",
-#         backstory="A skilled dealmaker who handles communication between buyer and seller to reach optimal agreements."
-#     )
+class ChatRequest(BaseModel):
+    message: str
 
-#     ua_task = Task(
-#         description="Handle user requests intelligently and route to the right agent."
-#     )
+def hash_password(plain_password: str) -> bytes:
+    return bcrypt.hashpw(plain_password.encode("utf-8"), bcrypt.gensalt())
 
-#     crew = Crew(
-#         agents=[buyer, negotiator],
-#         tasks=[ua_task]
-#     )
+def verify_password(plain_password: str, hashed: bytes) -> bool:
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed)
 
-#     return crew
+def create_token(user_id: str) -> str:
+    exp = datetime.utcnow() + timedelta(seconds=settings.JWT_EXP_DELTA_SECONDS)
+    payload = {"sub": str(user_id), "exp": exp}
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return token
 
-# ---------- CLI loop ----------
-if __name__ == "__main__":
-    ua = UserAgent()
-    print("🤖 User Agent.")
-    print("Type something ('quit' to exit).")
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Token invalide")
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            raise HTTPException(status_code=401, detail="Utilisateur introuvable")
+        user["id"] = str(user["_id"])
+        return user
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token invalide")
 
-    while True:
-        msg = input("You: ")
-        if msg.lower() in ["quit", "exit"]:
-            break
-        reply = ua.chat(msg)
-        print("UA:", reply)
+
+@app.post("/signup", status_code=201)
+def signup(payload: SignupModel):
+    if users_collection.find_one({"email": payload.email}):
+        raise HTTPException(status_code=400, detail="Email déjà utilisé.")
+
+    hashed = hash_password(payload.password)
+    user_doc = {
+        "email": payload.email,
+        "password_hash": hashed,
+        "name": payload.name,
+        "created_at": datetime.utcnow()
+    }
+    res = users_collection.insert_one(user_doc)
+    
+    memory_collection.insert_one({
+        "user_id": res.inserted_id,
+        "likes": [],
+        "dislikes": [],
+        "updated_at": datetime.utcnow()
+    })
+
+    return {"msg": "Compte créé", "user_id": str(res.inserted_id)}
+
+@app.post("/token", response_model=TokenResponse)
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = users_collection.find_one({"email": form_data.username})
+    if not user or not verify_password(form_data.password, user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Identifiants invalides.")
+
+    token = create_token(str(user["_id"]))
+    return {"access_token": token, "expires_in": settings.JWT_EXP_DELTA_SECONDS}
+
+@app.get("/me")
+def read_my_profile(current_user: dict = Depends(get_current_user)):
+    mem = memory_collection.find_one({"user_id": ObjectId(current_user["id"])})
+    return {
+        "email": current_user["email"],
+        "name": current_user.get("name"),
+        "memory": {
+            "likes": mem.get("likes", []) if mem else [],
+            "dislikes": mem.get("dislikes", []) if mem else []
+        }
+    }
+
+@app.post("/chat")
+def chat(payload: ChatRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Route Chat : Délègue tout à l'UserAgent (qui utilise maintenant Groq).
+    """
+    response = agent.process_message(current_user["id"], payload.message)
+    return {"response": response}

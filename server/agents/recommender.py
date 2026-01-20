@@ -1,103 +1,88 @@
-import os
-from openai import OpenAI
-import json
-from bson import ObjectId
+from typing import List, Dict, Any
+import math
+
 
 class RecommenderAgent:
-    def __init__(self):
-        self.client = OpenAI(
-            api_key=os.getenv("OPENAI_API_KEY")
-        )
+    """
+    Deterministic negotiation + scoring engine
+    """
 
-    def recommend(self, query, products, user_prefs):
-        try:
-            if not products or len(products) == 0:
-                return "❌ Aucun produit trouvé pour votre recherche."
+    def __init__(self, deal_hunter):
+        self.deal_hunter = deal_hunter
 
-            # Clean and structure the product data
-            clean_products = []
-            for p in products[:10]:
-                clean_products.append({
-                    "title": p.get('title', 'N/A'),
-                    "price": p.get('price', 0),
-                    "currency": p.get('currency', 'USD'),
-                    "seller": p.get('source', 'N/A'),
-                    "rating": p.get('rating', 0),
-                    "reviews": p.get('reviews', 0),
-                    "url": p.get('url', 'N/A'),
-                    "availability": p.get('availability', 'In Stock')
-                })
+    def normalize(self, products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        normalized = []
 
-            # ✅ Clean user_prefs to remove ObjectId and make it JSON-serializable
-            clean_prefs = self._clean_mongo_data(user_prefs)
+        for p in products:
+            price = p.get("extracted_price") or p.get("price")
 
-            print(f"📝 Analyzing {len(clean_products)} products")
-            
-            response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                temperature=0.7,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "Tu es un expert en recommandation de produits e-commerce.\n\n"
-                            "RÈGLES IMPORTANTES:\n"
-                            "1. Tu as accès à des données RÉELLES de produits\n"
-                            "2. Analyse TOUS les produits fournis\n"
-                            "3. Recommande les 3-5 meilleurs en fonction de:\n"
-                            "   - Rapport qualité/prix\n"
-                            "   - Notes et avis clients\n"
-                            "   - Réputation du vendeur\n"
-                            "   - Disponibilité\n"
-                            "4. Sois spécifique: mentionne les prix exacts et les liens\n"
-                            "5. Explique pourquoi tu recommandes chaque produit\n\n"
-                            f"Profil utilisateur: {json.dumps(clean_prefs, ensure_ascii=False)}\n"
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": (
-                            f"Requête: {query}\n\n"
-                            f"Produits disponibles:\n```json\n{json.dumps(clean_products, indent=2, ensure_ascii=False)}\n```\n\n"
-                            "Analyse ces produits et recommande-moi les meilleures options."
-                        )
-                    }
-                ],
-                max_tokens=1500
+            try:
+                price = float(str(price).replace("$", "").replace(",", ""))
+            except:
+                price = None
+
+            normalized.append({
+                "title": p.get("title"),
+                "price": price,
+                "rating": float(p["rating"]) if p.get("rating") else None,
+                "reviews": p.get("reviews"),
+                "merchant": p.get("merchant"),
+                "link": p.get("link"),
+                "thumbnail": p.get("thumbnail"),
+            })
+
+        return normalized
+    
+        def recommend(self, products: List[Dict]) -> List[Dict]:
+            enriched_products = []
+
+            for product in products:
+                deals = self.deal_hunter.find_deals_for_product(product)
+                product["deals"] = deals
+                product["has_deal"] = len(deals) > 0
+                enriched_products.append(product)
+            enriched_products.sort(key=lambda p: (not p["has_deal"], p.get("price", float("inf"))))
+
+        return enriched_products
+
+    def negotiate(
+        self,
+        products: List[Dict[str, Any]],
+        max_price: float | None = None,
+        min_rating: float = 3.5
+    ) -> List[Dict[str, Any]]:
+
+        negotiated = []
+
+        for p in products:
+            if not p["price"]:
+                continue
+
+            score = 0
+            score += max(0, 1000 - p["price"])
+
+            if max_price and p["price"] > max_price:
+                score -= 500
+
+            if p["rating"]:
+                score += p["rating"] * 100
+                if p["rating"] < min_rating:
+                    score -= 300
+
+            counter_offer = round(p["price"] * 0.93, 2)
+
+            acceptance_prob = min(
+                95,
+                max(30, int(50 + (score / 40)))
             )
 
-            recommendation = response.choices[0].message.content
-            
-            # Add a summary at the end
-            valid_prices = [p['price'] for p in clean_products if isinstance(p['price'], (int, float)) and p['price'] > 0]
-            avg_price = sum(valid_prices) / len(valid_prices) if valid_prices else 0
-            
-            summary = (
-                f"\n\n---\n"
-                f"📊 {len(clean_products)} produits analysés pour: '{query}'\n"
-            )
-            
-            if avg_price > 0:
-                summary += f"💰 Prix moyen: {avg_price:.2f} USD"
-            
-            return recommendation + summary
+            negotiated.append({
+                **p,
+                "score": score,
+                "listed_price": p["price"],
+                "counter_offer": counter_offer,
+                "acceptance_probability": acceptance_prob,
+                "strategy": "Balanced negotiation based on market flexibility"
+            })
 
-        except Exception as e:
-            print(f"❌ Erreur Recommender: {e}")
-            import traceback
-            traceback.print_exc()
-            return f"Erreur: {e}"
-
-    def _clean_mongo_data(self, data):
-        """
-        Recursively clean MongoDB data to make it JSON serializable
-        Converts ObjectId to string and handles nested structures
-        """
-        if isinstance(data, dict):
-            return {k: self._clean_mongo_data(v) for k, v in data.items()}
-        elif isinstance(data, list):
-            return [self._clean_mongo_data(item) for item in data]
-        elif isinstance(data, ObjectId):
-            return str(data)
-        else:
-            return data
+        return sorted(negotiated, key=lambda x: x["score"], reverse=True)

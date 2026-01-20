@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Lock, Mail, User, LogIn, UserPlus, Eye, EyeOff, Send, MessageSquare, RefreshCw, BrainCircuit } from 'lucide-react';
+import { Lock, Mail, User, LogIn, UserPlus, Eye, EyeOff, Send, MessageSquare, BrainCircuit, Sparkles, Bot, UserCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -159,102 +159,137 @@ export default function AuthApp() {
 
   if (isLoggedIn && userData) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4 md:p-8 flex gap-6 justify-center items-start">
-        <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 sticky top-8 h-[750px] flex flex-col relative">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 md:p-8 flex gap-6 justify-center items-start">
+        {/* Sidebar - User Profile & Memory */}
+        <div className="w-full max-w-sm bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 p-6 sticky top-8 h-[750px] flex flex-col relative">
           <div className="text-center mb-6 flex-shrink-0">
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full mx-auto mb-4 flex items-center justify-center text-white shadow-lg">
-              <User size={40} />
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center text-white shadow-xl ring-4 ring-blue-100">
+              <User size={40} strokeWidth={2.5} />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800">Welcome Back!</h2>
-            <p className="text-lg text-gray-600 font-medium">{userData.name || 'User'}</p>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent">Welcome Back!</h2>
+            <p className="text-lg text-gray-700 font-medium mt-1">{userData.name || 'User'}</p>
           </div>
-          <div className="flex-1 bg-indigo-50 border border-indigo-100 rounded-2xl p-4 overflow-hidden flex flex-col mb-16">
-            <div className="flex items-center justify-between mb-3 border-b border-indigo-200 pb-2 flex-shrink-0">
-              <div className="flex items-center gap-2 text-indigo-800 font-bold">
-                <BrainCircuit size={20} />
-                <h3>Mémoire IA</h3>
+
+          {/* Memory Section */}
+          <div className="flex-1 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl p-5 overflow-hidden flex flex-col mb-16 shadow-inner">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-indigo-200 flex-shrink-0">
+              <div className="flex items-center gap-2 text-indigo-900 font-bold text-lg">
+                <BrainCircuit size={22} className="text-indigo-600" />
+                <h3>AI Memory</h3>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto space-y-5 pr-2 custom-scrollbar">
+              {/* Likes */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-green-700 mb-2 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Ce que j'aime
+                <h4 className="text-xs font-bold uppercase tracking-wider text-green-700 mb-2.5 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> 
+                  What I Like
                 </h4>
                 {userData.memory.likes.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {userData.memory.likes.map((like, i) => (
-                      <span key={i} className="bg-white text-green-800 px-2 py-1 rounded-md text-xs border border-green-200 shadow-sm">
+                      <span key={i} className="bg-white text-green-800 px-3 py-1.5 rounded-lg text-xs font-medium border border-green-200 shadow-sm hover:shadow-md transition-shadow">
                         {like}
                       </span>
                     ))}
                   </div>
-                ) : <p className="text-gray-400 text-xs italic">Aucune donnée...</p>}
+                ) : <p className="text-gray-400 text-xs italic">No data yet...</p>}
               </div>
 
+              {/* Dislikes */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-red-700 mb-2 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Ce que je déteste
+                <h4 className="text-xs font-bold uppercase tracking-wider text-red-700 mb-2.5 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> 
+                  What I Dislike
                 </h4>
                 {userData.memory.dislikes.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {userData.memory.dislikes.map((dislike, i) => (
-                      <span key={i} className="bg-white text-red-800 px-2 py-1 rounded-md text-xs border border-red-200 shadow-sm">
+                      <span key={i} className="bg-white text-red-800 px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 shadow-sm hover:shadow-md transition-shadow">
                         {dislike}
                       </span>
                     ))}
                   </div>
-                ) : <p className="text-gray-400 text-xs italic">Aucune donnée...</p>}
+                ) : <p className="text-gray-400 text-xs italic">No data yet...</p>}
               </div>
             </div>
-            
-            
           </div>
 
+          {/* Logout Button */}
           <div className='absolute inset-x-6 bottom-6'>
             <button
               onClick={handleLogout}
-              className="w-full bg-red-50 text-red-600 py-3 rounded-xl font-semibold hover:bg-red-100 transition-colors border border-red-100"
+              className="w-full bg-gradient-to-r from-red-50 to-red-100 text-red-600 py-3 rounded-xl font-semibold hover:from-red-100 hover:to-red-200 transition-all border border-red-200 shadow-md hover:shadow-lg"
             >
               Logout
             </button>
           </div>
         </div>
 
-        <div className="w-full  bg-white rounded-2xl shadow-xl flex flex-col h-[750px]">
-          <div className="p-4 border-b bg-white rounded-t-2xl flex justify-between items-center shadow-sm z-10">
-            <h3 className="font-bold text-gray-700 flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              AI Assistant
-            </h3>
+        {/* Chat Area */}
+        <div className="w-full bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 flex flex-col h-[750px] overflow-hidden">
+          {/* Chat Header */}
+          <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-3xl flex justify-between items-center shadow-sm z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Bot size={22} className="text-white" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                  AI Shopping Assistant
+                </h3>
+                <div className="flex items-center gap-1.5 text-xs text-green-600">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span>Online</span>
+                </div>
+              </div>
+            </div>
+            <Sparkles size={20} className="text-indigo-500" />
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-gradient-to-b from-gray-50/50 to-white">
             {messages.length === 0 && (
-              <div className="text-center text-gray-400 mt-20">
-                <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                <p>Start chatting! Try telling me what you like.</p>
-                <p className="text-xs mt-2">Example: "I like chocolate and coding"</p>
+              <div className="text-center mt-24">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <MessageSquare className="w-10 h-10 text-indigo-400" />
+                </div>
+                <p className="text-gray-500 font-medium text-lg">Start your conversation!</p>
+                <p className="text-sm text-gray-400 mt-2">Try: "I like chocolate and coding"</p>
               </div>
             )}
             
             {messages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                {msg.role === 'ai' && (
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+                    <Bot size={18} className="text-white" />
+                  </div>
+                )}
+                
                 <div 
-                  className={`max-w-[80%] p-3 rounded-2xl shadow-sm text-sm overflow-hidden ${
+                  className={`max-w-[75%] px-4 py-3 rounded-2xl shadow-md text-sm ${
                     msg.role === 'user' 
-                      ? 'bg-blue-600 text-white rounded-tr-none' 
-                      : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
+                      ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-tr-sm' 
+                      : 'bg-white text-gray-800 border border-gray-100 rounded-tl-sm'
                   }`}
                 >
                   {msg.role === 'user' ? (
-                    msg.text
+                    <p className="leading-relaxed">{msg.text}</p>
                   ) : (
-                    <div className="prose prose-sm max-w-none">
+                    <div className="prose prose-sm max-w-none prose-headings:text-gray-800 prose-p:text-gray-700 prose-strong:text-gray-900 prose-a:text-blue-600">
                       <ReactMarkdown 
                         remarkPlugins={[remarkGfm]}
                         components={{
-                          a: ({node, ...props}) => <a {...props} className="text-blue-600 underline hover:text-blue-800" target="_blank" rel="noopener noreferrer" />
+                          a: ({node, ...props}) => (
+                            <a {...props} className="text-blue-600 hover:text-blue-700 underline font-medium" target="_blank" rel="noopener noreferrer" />
+                          ),
+                          code: ({node, inline, ...props}) => (
+                            inline ? 
+                              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono text-pink-600" {...props} /> :
+                              <code className="block bg-gray-100 p-2 rounded-lg text-xs font-mono overflow-x-auto" {...props} />
+                          )
                         }}
                       >
                         {msg.text}
@@ -262,34 +297,45 @@ export default function AuthApp() {
                     </div>
                   )}
                 </div>
+
+                {msg.role === 'user' && (
+                  <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+                    <UserCircle size={18} className="text-white" />
+                  </div>
+                )}
               </div>
             ))}
+
             {chatLoading && (
-              <div className="flex justify-start">
-                <div className="bg-white p-3 rounded-2xl rounded-tl-none border shadow-sm flex gap-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+              <div className="flex gap-3 justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+                  <Bot size={18} className="text-white" />
+                </div>
+                <div className="bg-white px-5 py-4 rounded-2xl rounded-tl-sm border border-gray-100 shadow-md flex gap-1.5">
+                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 bg-white border-t rounded-b-2xl">
-            <form onSubmit={handleSendMessage} className="flex gap-2">
+          {/* Input Area */}
+          <div className="p-5 bg-white border-t border-gray-100 rounded-b-3xl">
+            <form onSubmit={handleSendMessage} className="flex gap-3">
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder="Type your message..."
                 disabled={chatLoading}
-                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                className="flex-1 px-5 py-3.5 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-gray-50 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <button 
                 type="submit" 
                 disabled={chatLoading || !chatInput.trim()}
-                className="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+                className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-5 py-3.5 rounded-2xl hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl disabled:shadow-md flex items-center justify-center"
               >
                 <Send size={20} />
               </button>
