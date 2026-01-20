@@ -115,11 +115,4 @@ SMA/
 - 🎛️ Intuitive control interface
 - 💾 Data persistence
 
-## 👤 Author
-
-**NourElhoda1**
-
-- GitHub: [@NourElhoda1](https://github.com/NourElhoda1)
-
-
 ---
